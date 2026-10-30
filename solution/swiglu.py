@@ -1,4 +1,4 @@
-"""Custom optimized SwiGLU kernel for Qwen2 MLP in Triton.
+"""Optimized vectorized SwiGLU kernel for Qwen2 MLP in Triton.
 """
 
 import torch
@@ -12,12 +12,16 @@ BLOCK = 2048
 def my_custom_swiglu_fwd_kernel(
     gate_ptr, up_ptr, out_ptr, n_elements, BLOCK: tl.constexpr
 ):
-    offsets = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+    pid = tl.program_id(0)
+    offsets = pid * BLOCK + tl.arange(0, BLOCK)
     mask = offsets < n_elements
+    
     gate = tl.load(gate_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
     up = tl.load(up_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
     
-    out = gate * tl.sigmoid(gate) * up
+    # Fused SwiGLU: silu(gate) * up -> gate * sigmoid(gate) * up
+    sig = tl.sigmoid(gate)
+    out = gate * sig * up
     
     tl.store(out_ptr + offsets, out.to(out_ptr.dtype.element_ty), mask=mask)
 
@@ -26,8 +30,10 @@ def my_custom_swiglu_fwd_kernel(
 def my_custom_swiglu_bwd_kernel(
     grad_ptr, gate_ptr, up_ptr, dgate_ptr, dup_ptr, n_elements, BLOCK: tl.constexpr
 ):
-    offsets = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+    pid = tl.program_id(0)
+    offsets = pid * BLOCK + tl.arange(0, BLOCK)
     mask = offsets < n_elements
+    
     grad = tl.load(grad_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
     gate = tl.load(gate_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
     up = tl.load(up_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
@@ -48,7 +54,8 @@ class SwiGLU(torch.autograd.Function):
         out = torch.empty_like(gate)
         n = gate.numel()
         
-        my_custom_swiglu_fwd_kernel[(triton.cdiv(n, BLOCK),)](
+        grid = lambda meta: (triton.cdiv(n, meta['BLOCK']),)
+        my_custom_swiglu_fwd_kernel[grid](
             gate, up, out, n, BLOCK=BLOCK
         )
         ctx.save_for_backward(gate, up)
@@ -61,7 +68,8 @@ class SwiGLU(torch.autograd.Function):
         dgate, dup = torch.empty_like(gate), torch.empty_like(up)
         n = gate.numel()
         
-        my_custom_swiglu_bwd_kernel[(triton.cdiv(n, BLOCK),)](
+        grid = lambda meta: (triton.cdiv(n, meta['BLOCK']),)
+        my_custom_swiglu_bwd_kernel[grid](
             grad, gate, up, dgate, dup, n, BLOCK=BLOCK
         )
         return dgate, dup
