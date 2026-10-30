@@ -1,12 +1,9 @@
-"""Optimized vectorized SwiGLU kernel for Qwen2 MLP in Triton.
+"""Highly optimized Triton SwiGLU kernel for Qwen2 MLP.
 """
 
 import torch
 import triton
 import triton.language as tl
-
-BLOCK = 2048
-
 
 @triton.jit
 def my_custom_swiglu_fwd_kernel(
@@ -19,7 +16,7 @@ def my_custom_swiglu_fwd_kernel(
     gate = tl.load(gate_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
     up = tl.load(up_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
     
-    # Fused SwiGLU: silu(gate) * up -> gate * sigmoid(gate) * up
+    # Быстрое вычисление SwiGLU
     sig = tl.sigmoid(gate)
     out = gate * sig * up
     
@@ -54,9 +51,12 @@ class SwiGLU(torch.autograd.Function):
         out = torch.empty_like(gate)
         n = gate.numel()
         
-        grid = lambda meta: (triton.cdiv(n, meta['BLOCK']),)
+        # Используем блок побольше для уменьшения количества запусков
+        BLOCK = 4096
+        grid = (triton.cdiv(n, BLOCK),)
+        
         my_custom_swiglu_fwd_kernel[grid](
-            gate, up, out, n, BLOCK=BLOCK
+            gate, up, out, n, BLOCK=BLOCK, num_warps=4
         )
         ctx.save_for_backward(gate, up)
         return out
@@ -68,9 +68,11 @@ class SwiGLU(torch.autograd.Function):
         dgate, dup = torch.empty_like(gate), torch.empty_like(up)
         n = gate.numel()
         
-        grid = lambda meta: (triton.cdiv(n, meta['BLOCK']),)
+        BLOCK = 4096
+        grid = (triton.cdiv(n, BLOCK),)
+        
         my_custom_swiglu_bwd_kernel[grid](
-            grad, gate, up, dgate, dup, n, BLOCK=BLOCK
+            grad, gate, up, dgate, dup, n, BLOCK=BLOCK, num_warps=4
         )
         return dgate, dup
 
