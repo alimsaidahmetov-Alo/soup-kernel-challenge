@@ -13,15 +13,15 @@ def my_custom_swiglu_fwd_kernel(
     offsets = pid * BLOCK + tl.arange(0, BLOCK)
     mask = offsets < n_elements
     
-    # Векторизованная загрузка больших блоков
-    gate = tl.load(gate_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
-    up = tl.load(up_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
+    # Загружаем данные в их родном формате (без принудительного перевода всего массива в float32)
+    gate = tl.load(gate_ptr + offsets, mask=mask)
+    up = tl.load(up_ptr + offsets, mask=mask)
     
-    # Быстрое вычисление SwiGLU
-    sig = tl.sigmoid(gate)
+    # Переводим во float32 только для вычисления сигмоиды (для точности), затем возвращаем тип
+    sig = tl.sigmoid(gate.to(tl.float32)).to(gate.dtype)
     out = gate * sig * up
     
-    tl.store(out_ptr + offsets, out.to(out_ptr.dtype.element_ty), mask=mask)
+    tl.store(out_ptr + offsets, out, mask=mask)
 
 
 @triton.jit
@@ -32,17 +32,16 @@ def my_custom_swiglu_bwd_kernel(
     offsets = pid * BLOCK + tl.arange(0, BLOCK)
     mask = offsets < n_elements
     
-    # Векторизованная загрузка больших блоков
-    grad = tl.load(grad_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
-    gate = tl.load(gate_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
-    up = tl.load(up_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
+    grad = tl.load(grad_ptr + offsets, mask=mask)
+    gate = tl.load(gate_ptr + offsets, mask=mask)
+    up = tl.load(up_ptr + offsets, mask=mask)
     
-    sig = tl.sigmoid(gate)
+    sig = tl.sigmoid(gate.to(tl.float32)).to(gate.dtype)
     dup = grad * gate * sig
     dgate = grad * up * sig * (1.0 + gate * (1.0 - sig))
     
-    tl.store(dgate_ptr + offsets, dgate.to(dgate_ptr.dtype.element_ty), mask=mask)
-    tl.store(dup_ptr + offsets, dup.to(dup_ptr.dtype.element_ty), mask=mask)
+    tl.store(dgate_ptr + offsets, dgate, mask=mask)
+    tl.store(dup_ptr + offsets, dup, mask=mask)
 
 
 class SwiGLU(torch.autograd.Function):
@@ -53,13 +52,12 @@ class SwiGLU(torch.autograd.Function):
         out = torch.empty_like(gate)
         n = gate.numel()
         
-        # Экстремально большой блок для T4: меньше запусков ядра, выше пропускная способность
-        BLOCK = 8192
+        # Возвращаем золотую середину для T4: блок 2048 и 4 варпа
+        BLOCK = 2048
         grid = (triton.cdiv(n, BLOCK),)
         
-        # num_warps=8 использует больше потоков на один блок
         my_custom_swiglu_fwd_kernel[grid](
-            gate, up, out, n, BLOCK=BLOCK, num_warps=8
+            gate, up, out, n, BLOCK=BLOCK, num_warps=4
         )
         ctx.save_for_backward(gate, up)
         return out
@@ -71,11 +69,11 @@ class SwiGLU(torch.autograd.Function):
         dgate, dup = torch.empty_like(gate), torch.empty_like(up)
         n = gate.numel()
         
-        BLOCK = 8192
+        BLOCK = 2048
         grid = (triton.cdiv(n, BLOCK),)
         
         my_custom_swiglu_bwd_kernel[grid](
-            grad, gate, up, dgate, dup, n, BLOCK=BLOCK, num_warps=8
+            grad, gate, up, dgate, dup, n, BLOCK=BLOCK, num_warps=4
         )
         return dgate, dup
 
