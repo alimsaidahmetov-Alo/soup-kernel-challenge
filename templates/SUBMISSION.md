@@ -6,7 +6,7 @@ Copy this file to the root of your repository as `SUBMISSION.md` and fill it in.
 - Repository, final commit: https://github.com/<you>/<repo>/commit/<sha>
 - Public Kaggle notebook, the saved version (`COMMIT` in it = the sha above; the same link must
   be in your README):
-  https://www.kaggle.com/code/<you>/<notebook>?scriptVersionId=<version>
+  [https://www.kaggle.com/code/](https://www.kaggle.com/code/alimsaidahmetov/notebookad310d557e)<you>/<notebook>?scriptVersionId=<version>
 - Demo video (up to 3 minutes): <link>
 - Presentation: <link>
 
