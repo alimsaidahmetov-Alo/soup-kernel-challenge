@@ -40,7 +40,6 @@ def qwen2_mlp_act_bwd(
     dup = grad * gs
     dgate = grad * up * (sig + gs * (1.0 - sig))
 
-    # In-place запись напрямую в gate_ptr и up_ptr (экономия памяти и времени!)
     tl.store(gate_ptr + offsets, dgate.to(gate_ptr.dtype.element_ty), mask=mask)
     tl.store(up_ptr + offsets, dup.to(up_ptr.dtype.element_ty), mask=mask)
 
@@ -97,10 +96,11 @@ class SwiGLU(torch.autograd.Function):
 
         out = torch.empty_like(gate)
         n = gate.numel()
-        BLOCK = 1024
+        # Увеличиваем BLOCK и num_warps для максимальной производительности на T4
+        BLOCK = 2048
 
         qwen2_mlp_act_fwd[(triton.cdiv(n, BLOCK),)](
-            gate, up, out, n, BLOCK=BLOCK, num_warps=4
+            gate, up, out, n, BLOCK=BLOCK, num_warps=8
         )
         ctx.save_for_backward(gate, up)
         return out
@@ -112,11 +112,10 @@ class SwiGLU(torch.autograd.Function):
             grad = grad.to(gate.dtype).contiguous()
 
         n = gate.numel()
-        BLOCK = 1024
+        BLOCK = 2048
 
-        # Модифицируем gate и up на месте без выделения новой памяти
         qwen2_mlp_act_bwd[(triton.cdiv(n, BLOCK),)](
-            grad, gate, up, n, BLOCK=BLOCK, num_warps=4
+            grad, gate, up, n, BLOCK=BLOCK, num_warps=8
         )
         return gate, up
 
