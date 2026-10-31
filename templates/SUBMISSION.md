@@ -12,7 +12,7 @@ Copy this file to the root of your repository as `SUBMISSION.md` and fill it in.
 
 ## Team (up to 4 people)
 | Name | Role | GitHub | Kaggle | Contact (captain) |
-|---|---|---|---|---|
+|Amina|---|---|---|---|
 | | | | | |
 
 ## Our kernels
