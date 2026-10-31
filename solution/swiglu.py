@@ -96,8 +96,8 @@ class SwiGLU(torch.autograd.Function):
 
         out = torch.empty_like(gate)
         n = gate.numel()
-        # Увеличиваем BLOCK и num_warps для максимальной производительности на T4
-        BLOCK = 2048
+        # Используем более крупный шаг, чтобы уменьшить количество запусков ядра (grid launches)
+        BLOCK = 4096
 
         qwen2_mlp_act_fwd[(triton.cdiv(n, BLOCK),)](
             gate, up, out, n, BLOCK=BLOCK, num_warps=8
@@ -112,7 +112,7 @@ class SwiGLU(torch.autograd.Function):
             grad = grad.to(gate.dtype).contiguous()
 
         n = gate.numel()
-        BLOCK = 2048
+        BLOCK = 4096
 
         qwen2_mlp_act_bwd[(triton.cdiv(n, BLOCK),)](
             grad, gate, up, n, BLOCK=BLOCK, num_warps=8
@@ -160,7 +160,6 @@ def swiglu(gate, up):
 
 
 def patch_qwen2_mlp():
-    """Интегрируем кастомные ядра SwiGLU и RMSNorm в модель Qwen2."""
     from transformers.models.qwen2 import modeling_qwen2
 
     orig_mlp = modeling_qwen2.Qwen2MLP.forward
