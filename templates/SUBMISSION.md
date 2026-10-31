@@ -8,7 +8,7 @@ Teams of up to 4, one result per team. AI agents are allowed.
 ## Links / Ссылки на материалы
 
 * **GitHub Repository:** `<вставьте_ссылку_на_репозиторий>`
-* **Kaggle Notebook:** [`<вставьте_ссылку_на_ноутбук>`](https://www.kaggle.com/code/alimsaidahmetov/notebookad310d557e)
+* **Kaggle Notebook:** (https://www.kaggle.com/code/alimsaidahmetov/notebookad310d557e)
 * **Video:** `<вставьте_ссылку_на_видео>`
 * **Presentation:** `<вставьте_ссылку_на_презентацию>`
 
