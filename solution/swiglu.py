@@ -1,4 +1,4 @@
-"""Ultra-optimized Triton MLP Activation & RMSNorm kernels for Qwen2 on T4.
+"""Highly optimized Triton MLP Activation & RMSNorm kernels for Qwen2.
 """
 
 import torch
@@ -40,6 +40,7 @@ def qwen2_mlp_act_bwd(
     dup = grad * gs
     dgate = grad * up * (sig + gs * (1.0 - sig))
 
+    # In-place запись напрямую в gate_ptr и up_ptr (экономия памяти и времени!)
     tl.store(gate_ptr + offsets, dgate.to(gate_ptr.dtype.element_ty), mask=mask)
     tl.store(up_ptr + offsets, dup.to(up_ptr.dtype.element_ty), mask=mask)
 
@@ -65,7 +66,7 @@ def qwen2_rmsnorm_fwd(
 
 @triton.jit
 def qwen2_rmsnorm_bwd(
-    dy_ptr, x_ptr, w_ptr, rstd_ptr, dx_ptr, dw_ptr,
+    dy_ptr, x_ptr, w_ptr, rstd_ptr, dx_ptr, dw_partial_ptr,
     stride, N: tl.constexpr, BLOCK: tl.constexpr
 ):
     row = tl.program_id(0)
@@ -83,16 +84,20 @@ def qwen2_rmsnorm_bwd(
     dx = (wdy - x_hat * c1) * rstd
 
     tl.store(dx_ptr + row * stride + cols, dx.to(dx_ptr.dtype.element_ty), mask=mask)
-    # Напрямую аккумулируем градиент весов без промежуточных гигантских буферов
-    tl.atomic_add(dw_ptr + cols, (dy * x_hat).to(tl.float32), mask=mask)
+    tl.store(dw_partial_ptr + row * stride + cols, dy * x_hat, mask=mask)
 
 
 class SwiGLU(torch.autograd.Function):
     @staticmethod
     def forward(ctx, gate, up):
+        if not gate.is_contiguous():
+            gate = gate.contiguous()
+        if not up.is_contiguous() or up.dtype != gate.dtype:
+            up = up.to(gate.dtype).contiguous()
+
         out = torch.empty_like(gate)
         n = gate.numel()
-        BLOCK = 2048
+        BLOCK = 1024
 
         qwen2_mlp_act_fwd[(triton.cdiv(n, BLOCK),)](
             gate, up, out, n, BLOCK=BLOCK, num_warps=4
@@ -103,9 +108,13 @@ class SwiGLU(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad):
         gate, up = ctx.saved_tensors
-        n = gate.numel()
-        BLOCK = 2048
+        if not grad.is_contiguous() or grad.dtype != gate.dtype:
+            grad = grad.to(gate.dtype).contiguous()
 
+        n = gate.numel()
+        BLOCK = 1024
+
+        # Модифицируем gate и up на месте без выделения новой памяти
         qwen2_mlp_act_bwd[(triton.cdiv(n, BLOCK),)](
             grad, gate, up, n, BLOCK=BLOCK, num_warps=4
         )
@@ -116,7 +125,7 @@ class FastRMSNorm(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x, weight, eps):
         orig_shape = x.shape
-        x_2d = x.view(-1, orig_shape[-1])
+        x_2d = x.contiguous().view(-1, orig_shape[-1])
         M, N = x_2d.shape
         BLOCK = triton.next_power_of_2(N)
 
@@ -138,12 +147,13 @@ class FastRMSNorm(torch.autograd.Function):
         dy_2d = dy.contiguous().view(M, N)
 
         dx = torch.empty_like(x_2d)
-        dw_f32 = torch.zeros(N, dtype=torch.float32, device=x_2d.device)
+        dw_partial = torch.empty((M, N), dtype=torch.float32, device=x_2d.device)
 
         qwen2_rmsnorm_bwd[(M,)](
-            dy_2d, x_2d, weight, rstd, dx, dw_f32, N, N=N, BLOCK=ctx.BLOCK, num_warps=4
+            dy_2d, x_2d, weight, rstd, dx, dw_partial, N, N=N, BLOCK=ctx.BLOCK, num_warps=4
         )
-        return dx.view(ctx.orig_shape), dw_f32.to(weight.dtype), None
+        dw = dw_partial.sum(dim=0).to(weight.dtype)
+        return dx.view(ctx.orig_shape), dw, None
 
 
 def swiglu(gate, up):
