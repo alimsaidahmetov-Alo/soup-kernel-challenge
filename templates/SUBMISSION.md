@@ -13,25 +13,26 @@ Teams of up to 4, one result per team. AI agents are allowed.
 * **Presentation:** `<вставьте_ссылку_на_презентацию>`
 
 ## Team / Команда
-
-* **Амина**: Frontend-разработчик, AI/Prompt-инженер
-* **Алим**: Project Manager, UI/UX Дизайнер, Frontend-разработчик
-* **Дария**: Product Manager
-* **Аиша**: Backend-разработчик
+| Team | Roles |
+|---|---|
+|**Амина**| Frontend-разработчик, AI/Prompt-инженер|
+|**Алим**| Project Manager, UI/UX Дизайнер, Frontend-разработчик|
+|**Дария**| Product Manager|
+|**Аиша**| Backend-разработчик|
 
 ## Our Results
 
 | Metric | Base Soup 0.77.0 | Solution | Result / Ratio |
 |---|---|---|---|
-| Speedup | 1.000x | 1.012x[cite: 1] | Counts as 1.000 (margin < 5%)[cite: 1] |
-| Memory (base/solution) | 1.000x | 1.158x[cite: 1] | **1.158x** (x0.863 of base peak)[cite: 1] |
-| Quality (eval loss vs base) | baseline | -0.000%[cite: 1] | PASS (within 0.5% limit)[cite: 1] |
-| Checks status | — | 10 / 10 passed[cite: 1] | **ALL CHECKS PASSED**[cite: 1] |
-| Custom kernels runtime | — | 7.4%[cite: 1] | PASS (>= 5% requirement)[cite: 1] |
+| Speedup | 1.000x | 1.023x | Counts as 1.000 (time x0.977 of base) |
+| Memory (base/solution) | 1.000x | 1.158x | **1.158x** (x0.863 of base peak) |
+| Quality (eval loss vs base) | baseline | +0.000% | PASS (within 0.5% limit) |
+| Checks status | — | 10 / 10 passed | **ALL CHECKS PASSED** |
+| Custom kernels runtime | — | 7.5% | PASS (>= 5% requirement) |
 
-Tested kernels[cite: 1]:
-- `qwen2_mlp_act_fwd` / `qwen2_mlp_act_bwd` (`solution/swiglu.py`)[cite: 1]
-- `qwen2_rmsnorm_fwd` / `qwen2_rmsnorm_bwd` (`solution/swiglu.py`)[cite: 1]
+Tested kernels:
+- `qwen2_mlp_act_fwd` / `qwen2_mlp_act_bwd` (`solution/swiglu.py`)
+- `qwen2_rmsnorm_fwd` / `qwen2_rmsnorm_bwd` (`solution/swiglu.py`)
 
 ## The task
 
