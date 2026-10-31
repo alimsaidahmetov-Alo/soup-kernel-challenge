@@ -10,7 +10,7 @@ Teams of up to 4, one result per team. AI agents are allowed.
 * **GitHub Repository:** https://github.com/alimsaidahmetov-Alo/soup-kernel-challenge
 * **Kaggle Notebook:** (https://www.kaggle.com/code/alimsaidahmetov/notebookad310d557e)
 * **Video:** `<вставьте_ссылку_на_видео>`
-* **Presentation:** `<вставьте_ссылку_на_презентацию>`
+* **Presentation:** https://canva.link/skerv8z4wdrihba
 
 ## Team / Команда
 | Team | Roles |
