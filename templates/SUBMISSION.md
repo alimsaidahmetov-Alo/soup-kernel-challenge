@@ -5,12 +5,19 @@ Case of [Soup](https://github.com/MakazhanAlpamys/Soup) at Decentrathon 6.0,
 October 30 12:00 – October 31 23:59 (Astana time, UTC+5; the deadline is October 31 18:59 UTC).
 Teams of up to 4, one result per team. AI agents are allowed.
 
-## Team
+## Links / Ссылки на материалы
 
-- **Амина**: Frontend-разработчик, AI/Prompt-инженер
-- **Алим**: Project Manager, UI/UX Дизайнер, Frontend-разработчик
-- **Дария**: Product Manager
-- **Аиша**: Backend-разработчик
+* **GitHub Repository:** `<вставьте_ссылку_на_репозиторий>`
+* **Kaggle Notebook:** [`<вставьте_ссылку_на_ноутбук>`](https://www.kaggle.com/code/alimsaidahmetov/notebookad310d557e)
+* **Video:** `<вставьте_ссылку_на_видео>`
+* **Presentation:** `<вставьте_ссылку_на_презентацию>`
+
+## Team / Команда
+
+* **Амина**: Frontend-разработчик, AI/Prompt-инженер
+* **Алим**: Project Manager, UI/UX Дизайнер, Frontend-разработчик
+* **Дария**: Product Manager
+* **Аиша**: Backend-разработчик
 
 ## Our Results
 
